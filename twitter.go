@@ -66,7 +66,7 @@ func (client *TwitterClient) LastPhotoTime(userID string) (mostRecentTime time.T
 
 	tweets, err := client.api.GetHomeTimeline(params)
 	if err != nil {
-		return mostRecentTime, err
+		return
 	}
 
 	for _, tweet := range tweets {
@@ -75,6 +75,7 @@ func (client *TwitterClient) LastPhotoTime(userID string) (mostRecentTime time.T
 		}
 
 		if createdTime, timeErr := tweet.CreatedAtTime(); timeErr != nil {
+			fmt.Printf("error getting created at time for tweet: (%v)\n", timeErr)
 			continue
 		} else if mostRecentTime.IsZero() || createdTime.After(mostRecentTime) {
 			mostRecentTime = createdTime
