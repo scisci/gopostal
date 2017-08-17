@@ -63,8 +63,9 @@ func (client *TwitterClient) UploadPhoto(path, caption string) error {
 func (client *TwitterClient) LastPhotoTime(userID string) (mostRecentTime time.Time, err error) {
 	params := url.Values{}
 	params.Set("count", "10")
+	params.Set("user_id", userID)
 
-	tweets, err := client.api.GetHomeTimeline(params)
+	tweets, err := client.api.GetUserTimeline(params)
 	if err != nil {
 		return
 	}
