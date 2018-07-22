@@ -2,6 +2,7 @@ package gopostal
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/ChimeraCoder/anaconda"
 	"io/ioutil"
@@ -22,6 +23,8 @@ type TwitterClient struct {
 	api     *anaconda.TwitterApi
 }
 
+var noMediaFoundErr = errors.New("No media found.")
+
 func NewTwitterClient(options *TwitterClientOptions) (*TwitterClient, error) {
 	if options == nil {
 		options = &TwitterClientOptions{}
@@ -35,6 +38,10 @@ func NewTwitterClient(options *TwitterClientOptions) (*TwitterClient, error) {
 		Options: options,
 		api:     api,
 	}, nil
+}
+
+func (client *TwitterClient) IsNoMediaFoundErr(err error) bool {
+	return err == noMediaFoundErr
 }
 
 func (client *TwitterClient) UploadPhoto(path, caption string) error {
@@ -84,7 +91,7 @@ func (client *TwitterClient) LastPhotoTime(userID string) (mostRecentTime time.T
 	}
 
 	if mostRecentTime.IsZero() {
-		err = fmt.Errorf("No media found.")
+		err = noMediaFoundErr
 	}
 
 	return

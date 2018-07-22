@@ -3,6 +3,7 @@ package gopostal
 import (
 	"fmt"
 	"github.com/ahmdrz/goinsta"
+	"github.com/ahmdrz/goinsta/store"
 	"github.com/yanatan16/golang-instagram/instagram"
 	"net/url"
 	"time"
@@ -14,11 +15,12 @@ const (
 )
 
 type InstagramClientOptions struct {
-	Username     string
-	Password     string
-	ClientID     string
-	ClientSecret string
-	AccessToken  string
+	Username     string // Instagram username
+	EncodedCreds string // Encoded instagram connection creds
+	EncodeSecret string // Key for encoded creds
+	ClientID     string // Api Client ID for reading
+	ClientSecret string // Api Client Secret for reading
+	AccessToken  string // Api Access Token
 }
 
 type InstagramClient struct {
@@ -27,13 +29,34 @@ type InstagramClient struct {
 	api        *instagram.Api
 }
 
+func MakeEncodedCreds(username, password, key string) (string, error) {
+	insta := goinsta.New(username, password)
+	if err := insta.Login(); err != nil {
+		return "", fmt.Errorf("Error logging in %v", err)
+	}
+	bytes, err := store.Export(insta, []byte(key))
+	if err != nil {
+		return "", fmt.Errorf("Error on export")
+	}
+
+	insta.Logout()
+	return string(bytes), nil
+}
+
 func NewInstagramClient(options *InstagramClientOptions) (*InstagramClient, error) {
 	if options == nil {
 		options = &InstagramClientOptions{}
 	}
 
-	privateAPI := goinsta.New(options.Username, options.Password)
-	if err := privateAPI.Login(); err != nil {
+	if options.EncodeSecret == "" {
+		return nil, fmt.Errorf("EncodeSecret must not be empty if you pass EncodedCreds")
+	}
+	privateAPI, err := store.Import([]byte(options.EncodedCreds), []byte(options.EncodeSecret))
+	if err != nil {
+		return nil, fmt.Errorf("Error on import")
+	}
+
+	if err = privateAPI.Login(); err != nil {
 		return nil, err
 	}
 
