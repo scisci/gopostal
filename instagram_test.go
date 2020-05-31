@@ -1,7 +1,7 @@
 package gopostal
 
 import (
-	"github.com/ahmdrz/goinsta/store"
+	"github.com/ahmdrz/goinsta/utilities"
 	"log"
 	"os"
 	"testing"
@@ -15,14 +15,13 @@ func TestExportImport(t *testing.T) {
 		t.Skip("Username or Password is empty")
 	}
 
-	var key = "RH1tCpR80AQ3WzXJ" //32byte key for AES
 	var encodedString string
 
 	{
-		creds, err := MakeEncodedCreds(username, password, key)
+		creds, err := MakeEncodedCreds(username, password)
 
 		if err != nil {
-			t.Error(err)
+			t.Errorf("Failed to make encoded creds %v", err)
 			return
 		}
 		encodedString = creds
@@ -31,10 +30,10 @@ func TestExportImport(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	{
-		privateAPI, err := store.Import([]byte(encodedString), []byte(key))
+		privateAPI, err := utilities.ImportFromBase64String(encodedString)
 
 		if err != nil {
-			t.Error(err)
+			t.Errorf("Failed to import from encoded %v", err)
 		}
 
 		privateAPI.Logout()

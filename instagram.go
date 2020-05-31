@@ -3,9 +3,10 @@ package gopostal
 import (
 	"fmt"
 	"github.com/ahmdrz/goinsta"
-	"github.com/ahmdrz/goinsta/store"
+	"github.com/ahmdrz/goinsta/utilities"
 	"github.com/yanatan16/golang-instagram/instagram"
-	"net/url"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -29,12 +30,12 @@ type InstagramClient struct {
 	api        *instagram.Api
 }
 
-func MakeEncodedCreds(username, password, key string) (string, error) {
+func MakeEncodedCreds(username, password string) (string, error) {
 	insta := goinsta.New(username, password)
 	if err := insta.Login(); err != nil {
 		return "", fmt.Errorf("Error logging in %v", err)
 	}
-	bytes, err := store.Export(insta, []byte(key))
+	bytes, err := utilities.ExportAsBase64String(insta)
 	if err != nil {
 		return "", fmt.Errorf("Error on export")
 	}
@@ -48,24 +49,21 @@ func NewInstagramClient(options *InstagramClientOptions) (*InstagramClient, erro
 		options = &InstagramClientOptions{}
 	}
 
-	if options.EncodeSecret == "" {
-		return nil, fmt.Errorf("EncodeSecret must not be empty if you pass EncodedCreds")
-	}
-	privateAPI, err := store.Import([]byte(options.EncodedCreds), []byte(options.EncodeSecret))
+	privateAPI, err := utilities.ImportFromBase64String(options.EncodedCreds)
 	if err != nil {
-		return nil, fmt.Errorf("Error on import")
+		return nil, fmt.Errorf("Error on importing creds")
 	}
 
-	if err = privateAPI.Login(); err != nil {
-		return nil, err
-	}
+	//if err = privateAPI.Login(); err != nil {
+	//	return nil, fmt.Errorf("Failed to login (%v)", err)
+	//}
 
-	api := instagram.New(options.ClientID, options.ClientSecret, options.AccessToken, false)
+	// api := instagram.New(options.ClientID, options.ClientSecret, options.AccessToken, false)
 
 	return &InstagramClient{
 		Options:    options,
 		privateAPI: privateAPI,
-		api:        api,
+		// api:        api,
 	}, nil
 }
 
@@ -74,27 +72,35 @@ func (client *InstagramClient) Logout() error {
 }
 
 func (client *InstagramClient) UploadPhoto(path, caption string) error {
-	return client.UploadPhotoWithUploadID(path, caption, client.privateAPI.NewUploadID())
-}
-
-func (client *InstagramClient) UploadPhotoWithUploadID(path, caption string, uploadID int64) error {
-	_, err := client.privateAPI.UploadPhoto(path, caption, uploadID,
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	_, err = client.privateAPI.UploadPhoto(file, caption,
 		InstagramDefaultQuality, InstagramDefaultFilter)
 	return err
 }
 
 func (client *InstagramClient) LastPhotoTime(userID string) (mostRecentTime time.Time, err error) {
-	params := url.Values{}
-	params.Set("count", "1")
-	resp, err := client.api.GetUserRecentMedia(userID, params)
-	if err != nil {
+	numericUserID, convErr := strconv.ParseInt(userID, 10, 64)
+	if convErr != nil {
+		err = convErr
 		return
 	}
 
-	for _, media := range resp.Medias {
-		if createdTime, timeErr := media.CreatedTime.Time(); timeErr != nil {
-			continue
-		} else if mostRecentTime.IsZero() || createdTime.After(mostRecentTime) {
+	user := client.privateAPI.NewUser()
+	user.ID = numericUserID
+
+	feed := user.Feed()
+	if !feed.Next() {
+		err = fmt.Errorf("failed to sync feed")
+		return
+	}
+
+	for _, media := range feed.Items {
+		fmt.Printf("\nreading item %d\n", media.DeviceTimestamp)
+		createdTime := time.Unix(0, media.DeviceTimestamp)
+		if mostRecentTime.IsZero() || createdTime.After(mostRecentTime) {
 			mostRecentTime = createdTime
 		}
 	}
